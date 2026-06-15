@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>matching fruit</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #FF9800;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- UI Header --- */
+        header {
+            background-color: #ffffff;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .headers-container {
+            display: flex;
+            flex-grow: 1;
+            justify-content: space-around;
+            gap: 20px;
+            margin-left: 20px;
+        }
+
+        .energy-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-grow: 1;
+            max-width: 300px;
+        }
+
+        .energy-label {
+            font-size: 0.9rem;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .energy-bar-bg {
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            height: 18px;
+            width: 100%;
+            overflow: hidden;
+            border: 2px solid #ccc;
+        }
+
+        .energy-bar-fill {
+            background-color: #4CAF50;
+            height: 100%;
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+
+        /* --- Kitchen Arenas Layout --- */
+        #main-stage {
+            flex-grow: 1;
+            display: flex;
+            position: relative;
+            background-color: #f4ebd0;
+        }
+
+        .arena {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Divider line for team mode */
+        .arena:not(:last-child) {
+            border-right: 4px dashed #FF9800;
+        }
+
+        /* --- Floating Entities --- */
+        .floating {
+            position: absolute;
+            cursor: grab;
+            touch-action: none;
+            will-change: transform;
+        }
+
+        .floating:active {
+            cursor: grabbing;
+        }
+
+        .emoji-item {
+            font-size: 3.2rem;
+            width: 65px;
+            height: 65px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        .word-item {
+            background: rgba(255, 255, 255, 0.92);
+            border: 2px dashed #777;
+            border-radius: 12px;
+            padding: 6px 14px;
+            font-size: 0.95rem;
+            color: #333;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            z-index: 2;
+            white-space: nowrap;
+        }
+
+        .word-item.drag-over {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+            transform: scale(1.08);
+        }
+
+        /* --- Fullscreen Screens/Overlays --- */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 100;
+            gap: 15px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .overlay h1 {
+            font-size: 2.8rem;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .overlay p {
+            font-size: 1.1rem;
+            color: #ccc;
+            margin-bottom: 15px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            padding: 14px 35px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #e68a00;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title">matching fruit</div>
+        <div class="headers-container">
+            <!-- Single player or Left side team panel -->
+            <div class="energy-container" id="energy-p1">
+                <span class="energy-label" id="label-p1">energy</span>
+                <div class="energy-bar-bg">
+                    <div id="energyBar1" class="energy-bar-fill"></div>
+                </div>
+            </div>
+            <!-- Right side team panel (Hidden in alone mode) -->
+            <div class="energy-container hidden" id="energy-p2">
+                <span class="energy-label">team 2 energy</span>
+                <div class="energy-bar-bg">
+                    <div id="energyBar2" class="energy-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="main-stage">
+        <div id="arena1" class="arena"></div>
+        <div id="arena2" class="arena hidden"></div>
+    </div>
+
+    <!-- Interface Screens -->
+    <div id="startScreen" class="overlay">
+        <h1>matching fruit</h1>
+        <p>drag the fruit emojis onto their correct lowercase labels.</p>
+        <div class="btn-group">
+            <button class="btn" onclick="setupGame('alone')">alone</button>
+            <button class="btn" onclick="setupGame('team')">in team</button>
+        </div>
+    </div>
+
+    <div id="endScreen" class="overlay hidden">
+        <h1 id="endTitle">game over</h1>
+        <p id="endSubtitle"></p>
+        <button class="btn" onclick="backToMenu()">main menu</button>
+    </div>
+
+    <script>
+        // --- Game Database Configuration ---
+        const FRUIT_DATA = [
+            { emoji: '🍇', word: 'grape' }, { emoji: '🍉', word: 'watermelon' },
+            { emoji: '🍊', word: 'orange' }, { emoji: '🍋', word: 'lemon' },
+            { emoji: '🍌', word: 'banana' }, { emoji: '🍍', word: 'pineapple' },
+            { emoji: '🥭', word: 'mango' },  { emoji: '🥝', word: 'kiwi' },
+            { emoji: '🍓', word: 'strawberry' }, { emoji: '🍑', word: 'peach' },
+            { emoji: '🍎', word: 'apple' },  { emoji: '🥥', word: 'coconut' },
+            { emoji: '🥑', word: 'avocado' }, { emoji: '🫐', word: 'blueberry' }
+        ];
+
+        // --- Web Audio Synthesizer ---
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.06); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.12); // G5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.linearRampToValueAtTime(90, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+                osc.start(now); osc.stop(now + 0.22);
+            }
+        }
+
+        // --- Core Engine Settings & States ---
+        let gameMode = 'alone'; // 'alone' or 'team'
+        let gameActive = false;
+        let animationFrameId = null;
+        let lastTime = 0;
+
+        // Structured state data arrays for moving components
+        let itemsArena1 = [];
+        let itemsArena2 = [];
+
+        // Interaction Tracking references
+        let activeDragItem = null; 
+        let touchOffset = { x: 0, y: 0 };
+
+        const arena1 = document.getElementById('arena1');
+        const arena2 = document.getElementById('arena2');
+        const energyBar1 = document.getElementById('energyBar1');
+        const energyBar2 = document.getElementById('energyBar2');
+
+        let stats = {
+            p1Energy: 100,
+            p2Energy: 100
+        };
+
+        // --- Initialization Mode Configurator ---
+        function setupGame(mode) {
+            initAudio();
+            gameMode = mode;
+
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('endScreen').classList.add('hidden');
+
+            // Toggle UI Layout configurations depending on team mode requirements
+            if (gameMode === 'team') {
+                arena2.classList.remove('hidden');
+                document.getElementById('energy-p2').classList.remove('hidden');
+                document.getElementById('label-p1').textContent = "team 1 energy";
+            } else {
+                arena2.classList.add('hidden');
+                document.getElementById('energy-p2').classList.add('hidden');
+                document.getElementById('label-p1').textContent = "energy";
+            }
+
+            // Flush out previous matches
+            arena1.innerHTML = '';
+            arena2.innerHTML = '';
+            itemsArena1 = [];
+            itemsArena2 = [];
+            stats.p1Energy = 100;
+            stats.p2Energy = 100;
+            
+            updateUIBars();
+
+            // Render matching structural items asynchronously once layout scales engine dimensions
+            setTimeout(() => {
+                buildArenaEntities(arena1, itemsArena1);
+                if (gameMode === 'team') {
+                    buildArenaEntities(arena2, itemsArena2);
+                }
+                
+                gameActive = true;
+                lastTime = performance.now();
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                animationFrameId = requestAnimationFrame(updateEngineLoop);
+            }, 50);
+        }
+
+        // --- Generator Layout Logic ---
+        function buildArenaEntities(targetArena, storageArray) {
+            const rect = targetArena.getBoundingClientRect();
+
+            FRUIT_DATA.forEach((fruit, index) => {
+                // Determine randomized layout coordinates unique per instance context
+                let eX = Math.random() * (rect.width - 70);
+                let eY = Math.random() * (rect.height - 70);
+                let wX = Math.random() * (rect.width - 110);
+                let wY = Math.random() * (rect.height - 40);
+
+                // Create Item Emoji Display Component
+                const emojiEl = document.createElement('div');
+                emojiEl.className = 'floating emoji-item';
+                emojiEl.textContent = fruit.emoji;
+                emojiEl.style.transform = `translate(${eX}px, ${eY}px)`;
+                targetArena.appendChild(emojiEl);
+
+                // Create Item Typography Matching Component
+                const wordEl = document.createElement('div');
+                wordEl.className = 'floating word-item';
+                wordEl.textContent = fruit.word;
+                wordEl.style.transform = `translate(${wX}px, ${wY}px)`;
+                targetArena.appendChild(wordEl);
+
+                // Push tracking item elements inside respective instances arrays
+                storageArray.push({
+                    el: emojiEl, type: 'emoji', id: index,
+                    x: eX, y: eY,
+                    vx: (Math.random() - 0.5) * 2.2, vy: (Math.random() - 0.5) * 2.2,
+                    width: 65, height: 65, isDragged: false
+                });
+
+                storageArray.push({
+                    el: wordEl, type: 'word', id: index,
+                    x: wX, y: wY,
+                    vx: (Math.random() - 0.5) * 1.4, vy: (Math.random() - 0.5) * 1.4,
+                    width: 90, height: 35, isDragged: false
+                });
+            });
+
+            // Adjust measurements explicitly inside engine data once bounding rect finishes browser painting
+            setTimeout(() => {
+                storageArray.forEach(item => {
+                    item.width = item.el.offsetWidth;
+                    item.height = item.el.offsetHeight;
+                });
+            }, 10);
+        }
+
+        // --- Unified Pointer Events Registration ---
+        function handlePointerStart(e) {
+            if (!gameActive) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const target = e.target.closest('.emoji-item');
+            if (!target) return;
+
+            // Resolve proper active working arena array depending on component location
+            const parentArena = target.parentElement;
+            const workingArray = (parentArena.id === 'arena1') ? itemsArena1 : itemsArena2;
+
+            const foundItem = workingArray.find(item => item.el === target);
+            if (foundItem) {
+                activeDragItem = foundItem;
+                activeDragItem.isDragged = true;
+                activeDragItem.arenaId = parentArena.id;
+
+                const rect = parentArena.getBoundingClientRect();
+                touchOffset.x = (clientX - rect.left) - activeDragItem.x;
+                touchOffset.y = (clientY - rect.top) - activeDragItem.y;
+            }
+        }
+
+        function handlePointerMove(e) {
+            if (!gameActive || !activeDragItem) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const parentArena = document.getElementById(activeDragItem.arenaId);
+            const rect = parentArena.getBoundingClientRect();
+
+            let newX = (clientX - rect.left) - touchOffset.x;
+            let newY = (clientY - rect.top) - touchOffset.y;
+
+            // Strict visual clamping bounds within active sub-arena frame
+            newX = Math.max(0, Math.min(newX, rect.width - activeDragItem.width));
+            newY = Math.max(0, Math.min(newY, rect.height - activeDragItem.height));
+
+            activeDragItem.x = newX;
+            activeDragItem.y = newY;
+            activeDragItem.el.style.transform = `translate(${newX}px, ${newY}px)`;
+
+            // Visual Hover Feedback Trigger
+            const workingArray = (activeDragItem.arenaId === 'arena1') ? itemsArena1 : itemsArena2;
+            workingArray.forEach(targetItem => {
+                if (targetItem.type === 'word') {
+                    if (isOverlapping(activeDragItem, targetItem)) {
+                        targetItem.el.classList.add('drag-over');
+                    } else {
+                        targetItem.el.classList.remove('drag-over');
+                    }
+                }
+            });
+        }
+
+        function handlePointerEnd() {
+            if (!activeDragItem) return;
+            activeDragItem.isDragged = false;
+
+            const isP1 = (activeDragItem.arenaId === 'arena1');
+            let workingArray = isP1 ? itemsArena1 : itemsArena2;
+            let matchedWordItem = null;
+
+            // Analyze bounding alignments for matches
+            workingArray.forEach(targetItem => {
+                if (targetItem.type === 'word' && isOverlapping(activeDragItem, targetItem)) {
+                    matchedWordItem = targetItem;
+                }
+                if (targetItem.type === 'word') targetItem.el.classList.remove('drag-over');
+            });
+
+            if (matchedWordItem) {
+                if (activeDragItem.id === matchedWordItem.id) {
+                    playSound('correct');
+                    
+                    if (isP1) {
+                        stats.p1Energy = Math.min(100, stats.p1Energy + 15);
+                        itemsArena1 = itemsArena1.filter(i => i !== activeDragItem && i !== matchedWordItem);
+                    } else {
+                        stats.p2Energy = Math.min(100, stats.p2Energy + 15);
+                        itemsArena2 = itemsArena2.filter(i => i !== activeDragItem && i !== matchedWordItem);
+                    }
+
+                    activeDragItem.el.remove();
+                    matchedWordItem.el.remove();
+                    updateUIBars();
+                    checkVictoryStates();
+                } else {
+                    playSound('wrong');
+                }
+            }
+
+            activeDragItem = null;
+        }
+
+        // Structural Event Connections across standard inputs
+        const stage = document.getElementById('main-stage');
+        stage.addEventListener('mousedown', handlePointerStart);
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerEnd);
+
+        stage.addEventListener('touchstart', handlePointerStart, { passive: false });
+        window.addEventListener('touchmove', handlePointerMove, { passive: false });
+        window.addEventListener('touchend', handlePointerEnd);
+
+        // --- Helper Mechanics Logic ---
+        function isOverlapping(item1, item2) {
+            return !(item1.x + item1.width < item2.x ||
+                     item1.x > item2.x + item2.width ||
+                     item1.y + item1.height < item2.y ||
+                     item1.y > item2.y + item2.height);
+        }
+
+        function updateUIBars() {
+            energyBar1.style.width = `${stats.p1Energy}%`;
+            energyBar2.style.width = `${stats.p2Energy}%`;
+        }
+
+        // --- Win/Loss Rules Enforcement ---
+        function checkVictoryStates() {
+            if (gameMode === 'alone' && itemsArena1.length === 0) {
+                triggerGameOver('win', 'you cleared all items cleanly.');
+            } else if (gameMode === 'team') {
+                const p1Finished = (itemsArena1.length === 0);
+                const p2Finished = (itemsArena2.length === 0);
+
+                if (p1Finished) {
+                    triggerGameOver('win', 'team 1 wins the match!');
+                } else if (p2Finished) {
+                    triggerGameOver('win', 'team 2 wins the match!');
+                }
+            }
+        }
+
+        function triggerGameOver(status, message) {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            const titleEl = document.getElementById('endTitle');
+            const subtitleEl = document.getElementById('endSubtitle');
+            
+            if (status === 'win') {
+                titleEl.textContent = "you win!";
+                subtitleEl.textContent = message;
+            } else {
+                titleEl.textContent = "game over";
+                subtitleEl.textContent = message;
+            }
+            
+            document.getElementById('endScreen').classList.remove('hidden');
+        }
+
+        function backToMenu() {
+            document.getElementById('endScreen').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            arena1.innerHTML = '';
+            arena2.innerHTML = '';
+        }
+
+        // --- Game Tick Engine Animation Loop ---
+        function updateEngineLoop(timestamp) {
+            if (!gameActive) return;
+
+            const elapsed = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Reduce energy pools progressively over real-time (Approx 4% / sec)
+            const drainValue = (4 * elapsed) / 1000;
+            
+            // Handle Alone Drain logic vs Team Drain logic
+            if (gameMode === 'alone') {
+                stats.p1Energy = Math.max(0, stats.p1Energy - drainValue);
+                if (stats.p1Energy === 0) {
+                    triggerGameOver('lose', 'your energy level completely ran out.');
+                    updateUIBars();
+                    return;
+                }
+            } else {
+                // Team Mode updates both independent pools
+                stats.p1Energy = Math.max(0, stats.p1Energy - drainValue);
+                stats.p2Energy = Math.max(0, stats.p2Energy - drainValue);
+                
+                if (stats.p1Energy === 0 && stats.p2Energy === 0) {
+                    triggerGameOver('lose', 'both teams exhausted their energy lines.');
+                    updateUIBars();
+                    return;
+                } else if (stats.p1Energy === 0 && itemsArena1.length > 0) {
+                    // Team 1 knocked out automatically hands alternative victory
+                    triggerGameOver('win', 'team 2 wins! team 1 energy hit zero.');
+                    return;
+                } else if (stats.p2Energy === 0 && itemsArena2.length > 0) {
+                    // Team 2 knocked out
+                    triggerGameOver('win', 'team 1 wins! team 2 energy hit zero.');
+                    return;
+                }
+            }
+            
+            updateUIBars();
+
+            // Handle Kinematic physics positions for active bounding boxes
+            processPhysicsForArena(arena1, itemsArena1);
+            if (gameMode === 'team') {
+                processPhysicsForArena(arena2, itemsArena2);
+            }
+
+            animationFrameId = requestAnimationFrame(updateEngineLoop);
+        }
+
+        function processPhysicsForArena(arenaElement, itemsArray) {
+            const rect = arenaElement.getBoundingClientRect();
+
+            itemsArray.forEach(item => {
+                if (item.isDragged) return; // Skip item physics calculation when interactive pointer moves it
+
+                item.x += item.vx;
+                item.y += item.vy;
+
+                // Handle Wall Bounds Reflection Logic (X axis)
+                if (item.x <= 0) {
+                    item.x = 0; item.vx *= -1;
+                } else if (item.x + item.width >= rect.width) {
+                    item.x = rect.width - item.width; item.vx *= -1;
+                }
+
+                // Handle Wall Bounds Reflection Logic (Y axis)
+                if (item.y <= 0) {
+                    item.y = 0; item.vy *= -1;
+                } else if (item.y + item.height >= rect.height) {
+                    item.y = rect.height - item.height; item.vy *= -1;
+                }
+
+                item.el.style.transform = `translate(${item.x}px, ${item.y}px)`;
+            });
+        }
+    </script>
+</body>
+</html>
